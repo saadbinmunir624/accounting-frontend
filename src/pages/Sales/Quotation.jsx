@@ -1,14 +1,12 @@
 // Quotation.jsx - Sales Quotations (Not included in stats/analytics)
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Calendar,
-  FileText,
-  CheckCircle,
-  AlertCircle
+  FileText
 } from 'lucide-react';
 import {
   quotationAPI,
@@ -22,6 +20,7 @@ import ItemFormModal from '../../components/Forms/ItemFormModal';
 import AccountFormModal from '../../components/Forms/AccountFormModal';
 
 const Quotation = () => {
+  const navigate = useNavigate();
   // View state
   const [view, setView] = useState('list'); // 'list' or 'form'
   const [editingQuotation, setEditingQuotation] = useState(null);
@@ -55,6 +54,7 @@ const Quotation = () => {
   });
 
   const [selectedStatus, setSelectedStatus] = useState('Draft');
+  const [isApproving, setIsApproving] = useState(false);
 
   // Search state for autocomplete
   const [itemSearchTerms, setItemSearchTerms] = useState({});
@@ -215,6 +215,35 @@ const Quotation = () => {
     setView('list');
     setEditingQuotation(null);
     setMessage({ type: '', text: '' });
+  };
+
+  const handleApproveClick = () => {
+    // Validate that there is at least one valid line item before proceeding
+    const validLineItems = formData.lineItems.filter(item => item.item && item.item !== '');
+
+    if (validLineItems.length === 0) {
+      setMessage({ type: 'error', text: 'Please add at least one line item with an item selected before approving' });
+      return;
+    }
+
+    // Build a lightweight quotation payload from current form state
+    const quotationPayload = {
+      ...formData,
+      lineItems: validLineItems,
+      status: selectedStatus,
+    };
+    setIsApproving(true);
+
+    // Small delay so the user can see the loader before navigating
+    setTimeout(() => {
+      navigate('/sales/invoices', {
+        state: {
+          fromQuotation: true,
+          quotationId: editingQuotation?._id || null,
+          quotation: quotationPayload,
+        },
+      });
+    }, 1000);
   };
 
   const handleDeleteQuotation = async (id) => {
@@ -549,15 +578,9 @@ const Quotation = () => {
                       <span className="font-semibold text-secondary-900">{formatCurrency(quotation.grandTotal)}</span>
                     </td>
                     <td className="py-2 px-3">
-                      <select
-                        value={quotation.status}
-                        onChange={(e) => handleStatusChange(quotation._id, e.target.value)}
-                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 ${getStatusClass(quotation.status)}`}
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Sent">Sent</option>
-                        <option value="Approved">Approved</option>
-                      </select>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(quotation.status)}`}>
+                        {quotation.status}
+                      </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
@@ -600,6 +623,15 @@ const Quotation = () => {
             {editingQuotation ? 'Update quotation details' : 'Create a new sales quotation'}
           </p>
         </div>
+        {(!editingQuotation || editingQuotation.status !== 'Approved') && (
+          <button
+            type="button"
+            onClick={handleApproveClick}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
+          >
+            Approve
+          </button>
+        )}
       </div>
 
       {/* Message */}
@@ -971,15 +1003,24 @@ const Quotation = () => {
           >
             Cancel
           </button>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold text-secondary-900"
-          >
-            <option value="Draft">Draft</option>
-            <option value="Sent">Sent</option>
-            <option value="Approved">Approved</option>
-          </select>
+          {editingQuotation && (editingQuotation.status === 'Approved' || selectedStatus === 'Approved') ? (
+            <select
+              value="Approved"
+              disabled
+              className="px-3 py-2 bg-secondary-100 border border-secondary-200 rounded-lg text-sm font-semibold text-secondary-700 cursor-not-allowed"
+            >
+              <option value="Approved">Approved</option>
+            </select>
+          ) : (
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold text-secondary-900"
+            >
+              <option value="Draft">Draft</option>
+              <option value="Sent">Sent</option>
+            </select>
+          )}
           <button
             type="button"
             onClick={() => handleSubmit(selectedStatus)}
@@ -1011,6 +1052,18 @@ const Quotation = () => {
         onClose={() => setShowAccountModal(false)}
         onSuccess={handleAccountSuccess}
       />
+
+      {isApproving && (
+        <div className="fixed inset-0 z-[999] bg-black bg-opacity-30 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
+            <div className="w-6 h-6 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+            <div>
+              <p className="text-sm font-semibold text-secondary-900">Moving quotation to Sales Invoice...</p>
+              <p className="text-xs text-secondary-600">Please wait a moment.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

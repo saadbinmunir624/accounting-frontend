@@ -6,21 +6,14 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Receipt,
   AlertCircle,
   Clock,
-  BarChart3,
-  FileText,
-  ShoppingBag,
-  Users,
   Plus,
   Calendar
 } from 'lucide-react';
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -30,7 +23,7 @@ import {
 } from 'recharts';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { salesInvoiceAPI, billAPI, contactAPI } from '../../services/api';
+import { salesInvoiceAPI, billAPI } from '../../services/api';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -51,6 +44,10 @@ const Dashboard = () => {
   const [endDate, setEndDate] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Load dashboard data when the time filter or custom dates change.
+  // We intentionally do not include `fetchDashboardData` in the
+  // dependency list to avoid re-running this effect on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchDashboardData();
   }, [timeFilter, startDate, endDate]);
@@ -284,11 +281,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl shadow-large p-8 text-white">
-        <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.fullName || 'User'}!</h1>
-        <p className="text-emerald-100">Here's what's happening with your business today.</p>
-      </div>
 
       {/* Stats Grid - 5 columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
@@ -533,10 +525,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold text-secondary-900">{formatCurrency(invoice.grandTotal)}</span>
                     <div className="flex items-center space-x-2">
-                      {isOverdue(invoice.dueDate, invoice.status) && (
-                        <span className="text-xs text-red-600 font-semibold">Overdue</span>
-                      )}
-                      {isDueSoon(invoice.dueDate) && !isOverdue(invoice.dueDate, invoice.status) && (
+                      {isDueSoon(invoice.dueDate) && invoice.status !== 'Overdue' && invoice.status !== 'Paid' && (
                         <span className="text-xs text-yellow-600 font-semibold">Due Soon</span>
                       )}
                       <span className="text-sm text-secondary-600">Due: {formatDate(invoice.dueDate)}</span>
@@ -580,10 +569,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold text-secondary-900">{formatCurrency(bill.grandTotal)}</span>
                     <div className="flex items-center space-x-2">
-                      {isOverdue(bill.dueDate, bill.status) && (
-                        <span className="text-xs text-red-600 font-semibold">Overdue</span>
-                      )}
-                      {isDueSoon(bill.dueDate) && !isOverdue(bill.dueDate, bill.status) && (
+                      {isDueSoon(bill.dueDate) && bill.status !== 'Overdue' && bill.status !== 'Paid' && (
                         <span className="text-xs text-yellow-600 font-semibold">Due Soon</span>
                       )}
                       <span className="text-sm text-secondary-600">Due: {formatDate(bill.dueDate)}</span>

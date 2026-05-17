@@ -12,6 +12,7 @@ const AccountType = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [formData, setFormData] = useState({
     name: '',
+    majorType: '',
   });
 
   useEffect(() => {
@@ -39,6 +40,7 @@ const AccountType = () => {
     setEditingType(null);
     setFormData({
       name: '',
+      majorType: '',
     });
     setMessage({ type: '', text: '' });
     setShowModal(true);
@@ -48,6 +50,7 @@ const AccountType = () => {
     setEditingType(type);
     setFormData({
       name: type.name || '',
+      majorType: type.majorType || '',
     });
     setMessage({ type: '', text: '' });
     setShowModal(true);
@@ -183,6 +186,7 @@ const AccountType = () => {
               <thead>
                 <tr className="border-b border-secondary-200 bg-secondary-50">
                   <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Name</th>
+                  <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Major Type</th>
                   <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Actions</th>
                 </tr>
               </thead>
@@ -196,6 +200,9 @@ const AccountType = () => {
                         </div>
                         <span className="font-semibold text-secondary-900">{type.name}</span>
                       </div>
+                    </td>
+                    <td className="py-2 px-3">
+                      <span className="text-sm text-secondary-700">{type.majorType || '-'}</span>
                     </td>
                     <td className="py-2 px-3">
                       <div className="flex items-center space-x-2">
@@ -259,7 +266,7 @@ const AccountType = () => {
             )}
 
             <form onSubmit={handleSubmit}>
-              <div className="px-6 py-6">
+              <div className="px-6 py-6 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-secondary-700 mb-2">
                     Name <span className="text-red-600">*</span>
@@ -271,8 +278,28 @@ const AccountType = () => {
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-                    placeholder="e.g., Assets, Liabilities, Equity"
+                    placeholder="e.g., Current Asset, Sales, Expense"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">
+                    Major Type <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    name="majorType"
+                    value={formData.majorType}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                  >
+                    <option value="">Select major type</option>
+                    <option value="Assets">Assets</option>
+                    <option value="Liabilities">Liabilities</option>
+                    <option value="Equity">Equity</option>
+                    <option value="Revenue">Revenue</option>
+                    <option value="Expenses">Expenses</option>
+                  </select>
                 </div>
               </div>
 

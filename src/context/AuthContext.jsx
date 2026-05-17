@@ -19,7 +19,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
-  // Configure axios defaults
+  // Configure axios defaults when token changes.
+  // We intentionally depend only on `token` here to avoid
+  // re-running this effect on every render due to `loadUser`'s
+  // changing function identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;

@@ -27,25 +27,11 @@ const ChartOfAccounts = () => {
     fetchTaxTypes();
   }, []);
 
-  useEffect(() => {
-    if (accountTypes.length > 0) {
-      fetchAccounts();
-    }
-  }, [filterType, accountTypes]);
-
   const fetchAccounts = async () => {
     try {
       setLoading(true);
       const response = await chartOfAccountsAPI.getAll();
-      let accountsData = response.data.data || response.data;
-
-      // Filter by account type if not 'all'
-      if (filterType !== 'all') {
-        accountsData = accountsData.filter(
-          (account) => account.accountType?._id === filterType || account.accountType === filterType
-        );
-      }
-
+      const accountsData = response.data.data || response.data;
       setAccounts(accountsData);
     } catch (error) {
       console.error('Error fetching accounts:', error);
@@ -54,6 +40,12 @@ const ChartOfAccounts = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (accountTypes.length > 0) {
+      fetchAccounts();
+    }
+  }, [filterType, accountTypes]);
 
   const fetchAccountTypes = async () => {
     try {
@@ -74,11 +66,25 @@ const ChartOfAccounts = () => {
   };
 
   // Filter accounts based on search
-  const filteredAccounts = accounts.filter((account) =>
-    account.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAccounts = accounts
+    .filter((account) =>
+      account.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .filter((account) => {
+      if (filterType === 'all') return true;
+
+      const typeId =
+        typeof account.accountType === 'object' && account.accountType?._id
+          ? account.accountType._id
+          : account.accountType;
+
+      const matchedType = accountTypes.find((t) => t._id === typeId);
+      const majorType = matchedType?.majorType;
+
+      return majorType === filterType;
+    });
 
   // Open modal for adding new account
   const handleAddNew = () => {
@@ -161,6 +167,35 @@ const ChartOfAccounts = () => {
     }
   };
 
+  // Import general/default chart of accounts
+  const handleImportDefaults = async () => {
+    if (!window.confirm('Import the general chart of accounts? Existing accounts with the same codes will be skipped.')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await chartOfAccountsAPI.importDefaults();
+      const importedCount = response.data?.importedCount ?? 0;
+      setMessage({
+        type: 'success',
+        text:
+          importedCount > 0
+            ? `Imported ${importedCount} default accounts successfully.`
+            : 'No new accounts to import. All default codes already exist.',
+      });
+      await fetchAccounts();
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      console.error('Error importing default chart of accounts:', error);
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to import default chart of accounts',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getAccountTypeName = (account) => {
     if (typeof account.accountType === 'object' && account.accountType?.name) {
       return account.accountType.name;
@@ -186,13 +221,22 @@ const ChartOfAccounts = () => {
           <h1 className="text-3xl font-bold text-secondary-900">Chart of Accounts</h1>
           <p className="text-secondary-600 mt-1">Manage your accounting chart of accounts</p>
         </div>
-        <button
-          onClick={handleAddNew}
-          className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-5 py-2.5 font-semibold flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Account</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleImportDefaults}
+            className="bg-secondary-100 hover:bg-secondary-200 text-secondary-800 rounded-lg px-4 py-2.5 font-semibold flex items-center space-x-2 border border-secondary-300 transition-all"
+          >
+            <BookOpen className="w-5 h-5" />
+            <span>Import General Chart of Accounts</span>
+          </button>
+          <button
+            onClick={handleAddNew}
+            className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-5 py-2.5 font-semibold flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Account</span>
+          </button>
+        </div>
       </div>
 
       {/* Message Alert */}
@@ -230,17 +274,17 @@ const ChartOfAccounts = () => {
             >
               All
             </button>
-            {accountTypes.map((type) => (
+            {['Assets', 'Liabilities', 'Equity', 'Revenue', 'Expenses'].map((label) => (
               <button
-                key={type._id}
-                onClick={() => setFilterType(type._id)}
+                key={label}
+                onClick={() => setFilterType(label)}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  filterType === type._id
+                  filterType === label
                     ? 'bg-primary-600 text-white shadow-md'
                     : 'bg-white text-secondary-700 border border-secondary-200 hover:bg-secondary-50'
                 }`}
               >
-                {type.name}
+                {label}
               </button>
             ))}
           </div>
@@ -415,12 +459,20 @@ const ChartOfAccounts = () => {
                       required
                       className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
                     >
-                      <option value="">Select account type</option>
-                      {accountTypes.map((type) => (
-                        <option key={type._id} value={type._id}>
-                          {type.name}
-                        </option>
-                      ))}
+                      <option value="">Select account category</option>
+                      {['Assets', 'Liabilities', 'Equity', 'Revenue', 'Expenses'].map((group) => {
+                        const typesInGroup = accountTypes.filter((t) => t.majorType === group);
+                        if (!typesInGroup.length) return null;
+                        return (
+                          <optgroup key={group} label={group.toUpperCase()}>
+                            {typesInGroup.map((type) => (
+                              <option key={type._id} value={type._id}>
+                                {type.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
                     </select>
                   </div>
 

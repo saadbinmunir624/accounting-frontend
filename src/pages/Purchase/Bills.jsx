@@ -1,14 +1,12 @@
 // Bills.jsx - Purchase Bills/Expenses (Vendor bills)
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Calendar,
-  FileText,
-  CheckCircle,
-  AlertCircle
+  FileText
 } from 'lucide-react';
 import {
   billAPI,
@@ -16,15 +14,20 @@ import {
   itemAPI,
   chartOfAccountsAPI,
   taxTypeAPI,
-  bankAccountAPI
+  bankAccountAPI,
+  purchaseOrderAPI,
 } from '../../services/api';
 import ContactFormModal from '../../components/Forms/ContactFormModal';
 import ItemFormModal from '../../components/Forms/ItemFormModal';
 import AccountFormModal from '../../components/Forms/AccountFormModal';
+import PaymentModal from '../../components/Forms/PaymentModal';
 
 const Bills = () => {
+  const location = useLocation();
+  const fromPurchaseOrderState = location.state && location.state.fromPurchaseOrder ? location.state : null;
+  const openBillForm = location.state && location.state.openBillForm;
   // View state
-  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [view, setView] = useState(fromPurchaseOrderState || openBillForm ? 'form' : 'list'); // 'list' or 'form'
   const [editingBill, setEditingBill] = useState(null);
 
   // List view state
@@ -37,11 +40,14 @@ const Bills = () => {
   const [taxTypes, setTaxTypes] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [sourcePurchaseOrderId] = useState(fromPurchaseOrderState?.purchaseOrderId || null);
+  const [initializedFromPurchaseOrder, setInitializedFromPurchaseOrder] = useState(false);
 
   // Modal states
   const [showContactModal, setShowContactModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Bill form data
   const [formData, setFormData] = useState({
@@ -61,6 +67,22 @@ const Bills = () => {
   });
 
   const [selectedStatus, setSelectedStatus] = useState('Draft');
+
+  // If editing an overdue bill: keep Overdue while due date is past; auto-reenable Payment Pending when due date moves to today/future
+  useEffect(() => {
+    if (!editingBill || editingBill.status !== 'Overdue' || !formData.dueDate) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(formData.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+
+    if (dueDate >= today) {
+      setSelectedStatus('Payment Pending');
+    } else if (selectedStatus !== 'Overdue') {
+      setSelectedStatus('Overdue');
+    }
+  }, [editingBill, formData.dueDate, selectedStatus]);
 
   // Search state for autocomplete
   const [itemSearchTerms, setItemSearchTerms] = useState({});
@@ -84,6 +106,46 @@ const Bills = () => {
     fetchTaxTypes();
     fetchBankAccounts();
   }, []);
+
+  // If navigated from a purchase order, initialize the bill form with PO data once
+  useEffect(() => {
+    if (!fromPurchaseOrderState || initializedFromPurchaseOrder || editingBill) return;
+
+    const purchaseOrder = fromPurchaseOrderState.purchaseOrder;
+    if (!purchaseOrder) return;
+
+    setFormData(prev => {
+      const poTaxMode = purchaseOrder.taxMode || purchaseOrder.amountTreatment || prev.taxMode;
+      const mappedLineItems = (purchaseOrder.lineItems || prev.lineItems || []).map((item) => ({
+        item: item.item || '',
+        description: item.description || '',
+        qty: item.qty || 1,
+        price: item.price || 0,
+        discount: item.discount || 0,
+        account: item.account || '',
+        taxType: item.taxType || item.taxRate || '',
+        taxAmount: item.taxAmount || 0,
+        amount: item.amount || 0,
+      }));
+
+      return {
+        ...prev,
+        contact: purchaseOrder.contact || prev.contact,
+        issueDate: purchaseOrder.issueDate?.split('T')[0] || prev.issueDate,
+        dueDate: '',
+        billNumber: '',
+        reference: purchaseOrder.reference || prev.reference,
+        taxMode: poTaxMode,
+        lineItems: mappedLineItems.length > 0 ? mappedLineItems : prev.lineItems,
+        subtotal: purchaseOrder.subtotal || prev.subtotal,
+        totalTax: purchaseOrder.totalTax || prev.totalTax,
+        grandTotal: purchaseOrder.grandTotal || prev.grandTotal,
+      };
+    });
+
+    setSelectedStatus('Draft');
+    setInitializedFromPurchaseOrder(true);
+  }, [fromPurchaseOrderState, initializedFromPurchaseOrder, editingBill]);
 
   const fetchBills = async () => {
     try {
@@ -124,7 +186,7 @@ const Bills = () => {
   const fetchTaxTypes = async () => {
     try {
       const response = await taxTypeAPI.getAll();
-      setTaxTypes(response.data.data || []);
+      setTaxTypes(response.data.data || response.data || []);
     } catch (error) {
       console.error('Error fetching tax types:', error);
     }
@@ -158,7 +220,7 @@ const Bills = () => {
   const getStatusClass = (status) => {
     const statusClasses = {
       Draft: 'bg-secondary-100 text-secondary-800',
-      Sent: 'bg-blue-100 text-blue-800',
+      'Payment Pending': 'bg-blue-100 text-blue-800',
       Paid: 'bg-green-100 text-green-800',
       Overdue: 'bg-red-100 text-red-800',
       Cancelled: 'bg-gray-100 text-gray-800',
@@ -263,47 +325,6 @@ const Bills = () => {
     }
   };
 
-  const handleStatusChange = async (id, newStatus) => {
-    try {
-      await billAPI.update(id, { status: newStatus });
-      setMessage({ type: 'success', text: 'Status updated successfully!' });
-      fetchBills();
-      setTimeout(() => setMessage({ type: '', text: '' }), 2000);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      setMessage({ type: 'error', text: 'Failed to update status' });
-    }
-  };
-
-  // Payment account functions
-  const handleAddPaymentAccount = () => {
-    setFormData({
-      ...formData,
-      paymentAccounts: [...formData.paymentAccounts, { bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handleRemovePaymentAccount = (index) => {
-    const newPaymentAccounts = formData.paymentAccounts.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      paymentAccounts: newPaymentAccounts.length > 0 ? newPaymentAccounts : [{ bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handlePaymentAccountChange = (index, field, value) => {
-    const newPaymentAccounts = [...formData.paymentAccounts];
-    newPaymentAccounts[index][field] = value;
-    setFormData({ ...formData, paymentAccounts: newPaymentAccounts });
-  };
-
-  // Calculate remaining amount for split payment
-  const calculateRemainingAmount = () => {
-    const totalAllocated = formData.paymentAccounts.reduce((sum, payment) => {
-      return sum + (parseFloat(payment.amount) || 0);
-    }, 0);
-    return formData.grandTotal - totalAllocated;
-  };
 
   // Line item functions
   const handleAddLine = () => {
@@ -333,7 +354,10 @@ const Bills = () => {
         newLineItems[index].description = selectedItem.description || '';
         newLineItems[index].price = selectedItem.costPrice || 0;
         newLineItems[index].account = selectedItem.purchaseAccount?._id || selectedItem.purchaseAccount || '';
-        newLineItems[index].taxType = selectedItem.taxRateOnPurchase?._id || selectedItem.taxRateOnPurchase || '';
+        // Only auto-assign tax type when overall tax mode is not "No Tax"
+        newLineItems[index].taxType = formData.taxMode === 'No Tax'
+          ? ''
+          : (selectedItem.taxRateOnPurchase?._id || selectedItem.taxRateOnPurchase || '');
       }
     }
 
@@ -342,53 +366,61 @@ const Bills = () => {
     const price = parseFloat(newLineItems[index].price) || 0;
     const discountPercent = parseFloat(newLineItems[index].discount) || 0;
 
-    const taxType = taxTypes.find(t => t._id === newLineItems[index].taxType);
-    const taxRate = taxType ? parseFloat(taxType.taxPercentage) / 100 : 0;
+    // Determine tax rate based on selected tax type and overall tax mode
+    let taxRate = 0;
+    if (formData.taxMode !== 'No Tax') {
+      const taxType = taxTypes.find(t => t._id === newLineItems[index].taxType);
+      taxRate = taxType ? parseFloat(taxType.taxPercentage) / 100 : 0;
+    }
 
-    // Calculate line item amount (qty * price - discount%)
     const lineSubtotal = qty * price;
     const discountAmount = lineSubtotal * (discountPercent / 100);
-    const lineAmount = lineSubtotal - discountAmount; // Amount BEFORE tax
 
-    // Calculate tax amount (tax is NOT included in line item amount)
-    const taxAmount = lineAmount * taxRate;
+    if (formData.taxMode === 'Including' && taxRate > 0) {
+      // Price is tax-inclusive: adjust so tax is inside the entered amount
+      const grossAmount = lineSubtotal - discountAmount; // amount the user sees (incl. tax)
+      const baseAmount = grossAmount / (1 + taxRate); // amount without tax
+      const taxAmount = grossAmount - baseAmount;
 
-    newLineItems[index].taxAmount = taxAmount;
-    newLineItems[index].amount = lineAmount; // This is the amount WITHOUT tax
+      newLineItems[index].amount = baseAmount;
+      newLineItems[index].taxAmount = taxAmount;
+    } else {
+      // Tax excluded or no tax: price is before tax
+      const lineAmount = lineSubtotal - discountAmount;
+      const taxAmount = formData.taxMode === 'No Tax' ? 0 : lineAmount * taxRate;
+
+      newLineItems[index].amount = lineAmount;
+      newLineItems[index].taxAmount = taxAmount;
+    }
 
     setFormData({ ...formData, lineItems: newLineItems });
     calculateTotals(newLineItems);
   };
 
-  const calculateTotals = (lineItems) => {
-    // Calculate subtotal - sum of all line item amounts (after discount, before tax)
+  const calculateTotals = (lineItems, taxModeOverride) => {
+    const taxMode = taxModeOverride || formData.taxMode;
+
+    // Subtotal is always the sum of amounts WITHOUT tax
     const subtotal = lineItems.reduce((sum, item) => {
       return sum + (parseFloat(item.amount) || 0);
     }, 0);
 
-    // Calculate total tax
+    // Total tax is the sum of all line tax amounts
     const totalTax = lineItems.reduce((sum, item) => sum + (parseFloat(item.taxAmount) || 0), 0);
 
     let grandTotal;
-    let adjustedSubtotal = subtotal;
 
-    if (formData.taxMode === 'Excluding') {
-      // Tax is excluded - add tax to subtotal
-      grandTotal = subtotal + totalTax;
-      adjustedSubtotal = subtotal;
-    } else if (formData.taxMode === 'Including') {
-      // Tax is included - re-adjust subtotal
+    if (taxMode === 'No Tax') {
+      // No tax at all
       grandTotal = subtotal;
-      adjustedSubtotal = subtotal - totalTax;
     } else {
-      // No tax
-      grandTotal = subtotal;
-      adjustedSubtotal = subtotal;
+      // For both Excluding and Including, total = net + tax.
+      grandTotal = subtotal + totalTax;
     }
 
     setFormData(prev => ({
       ...prev,
-      subtotal: adjustedSubtotal,
+      subtotal,
       totalTax,
       grandTotal,
     }));
@@ -427,16 +459,18 @@ const Bills = () => {
   const handleItemSearch = (index, searchTerm) => {
     setItemSearchTerms({ ...itemSearchTerms, [index]: searchTerm });
 
-    if (searchTerm.trim()) {
-      const results = items.filter(item =>
-        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setItemSearchResults({ ...itemSearchResults, [index]: results });
-      setShowItemDropdown({ ...showItemDropdown, [index]: true });
-    } else {
-      setShowItemDropdown({ ...showItemDropdown, [index]: false });
-    }
+    const safeItems = Array.isArray(items) ? items : [];
+    const term = searchTerm.trim().toLowerCase();
+
+    const results = term
+      ? safeItems.filter(item =>
+          item.name?.toLowerCase().includes(term) ||
+          item.itemCode?.toLowerCase().includes(term)
+        )
+      : safeItems;
+
+    setItemSearchResults({ ...itemSearchResults, [index]: results });
+    setShowItemDropdown({ ...showItemDropdown, [index]: true });
   };
 
   const handleSelectItem = (index, item) => {
@@ -449,16 +483,18 @@ const Bills = () => {
   const handleAccountSearch = (index, searchTerm) => {
     setAccountSearchTerms({ ...accountSearchTerms, [index]: searchTerm });
 
-    if (searchTerm.trim()) {
-      const results = accounts.filter(account =>
-        account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        account.code?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setAccountSearchResults({ ...accountSearchResults, [index]: results });
-      setShowAccountDropdown({ ...showAccountDropdown, [index]: true });
-    } else {
-      setShowAccountDropdown({ ...showAccountDropdown, [index]: false });
-    }
+    const safeAccounts = Array.isArray(accounts) ? accounts : [];
+    const term = searchTerm.trim().toLowerCase();
+
+    const results = term
+      ? safeAccounts.filter(account =>
+          account.name?.toLowerCase().includes(term) ||
+          account.code?.toLowerCase().includes(term)
+        )
+      : safeAccounts;
+
+    setAccountSearchResults({ ...accountSearchResults, [index]: results });
+    setShowAccountDropdown({ ...showAccountDropdown, [index]: true });
   };
 
   const handleSelectAccount = (index, account) => {
@@ -469,6 +505,12 @@ const Bills = () => {
 
   // Form submission
   const handleSubmit = async (status) => {
+    // If status is "Paid", open payment modal to collect allocation
+    if (status === 'Paid') {
+      setShowPaymentModal(true);
+      return;
+    }
+
     try {
       // Filter out empty line items (where item is not selected)
       const validLineItems = formData.lineItems.filter(item => item.item && item.item !== '');
@@ -476,33 +518,6 @@ const Bills = () => {
       if (validLineItems.length === 0) {
         setMessage({ type: 'error', text: 'Please add at least one line item with an item selected' });
         return;
-      }
-
-      // Validate split payment if enabled
-      if (formData.useSplitPayment) {
-        const validPaymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-
-        if (validPaymentAccounts.length === 0) {
-          setMessage({ type: 'error', text: 'Please add at least one bank account with an amount for split payment' });
-          return;
-        }
-
-        const totalAllocated = validPaymentAccounts.reduce((sum, payment) => {
-          return sum + (parseFloat(payment.amount) || 0);
-        }, 0);
-
-        const roundedTotal = Math.round(totalAllocated * 100) / 100;
-        const roundedGrandTotal = Math.round(formData.grandTotal * 100) / 100;
-
-        if (Math.abs(roundedTotal - roundedGrandTotal) > 0.01) {
-          setMessage({
-            type: 'error',
-            text: `Split payment total ($${roundedTotal.toFixed(2)}) must equal grand total ($${roundedGrandTotal.toFixed(2)})`
-          });
-          return;
-        }
       }
 
       const billData = {
@@ -517,22 +532,11 @@ const Bills = () => {
         status,
       };
 
-      // Handle payment accounts based on split payment mode
-      if (formData.useSplitPayment) {
-        // Send paymentAccounts array
-        billData.paymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-        delete billData.onlinePayment;
-      } else {
-        // Send single onlinePayment
-        billData.onlinePayment = formData.onlinePayment || undefined;
-        delete billData.paymentAccounts;
-      }
-
       // Remove frontend-only fields
       delete billData.taxMode;
       delete billData.useSplitPayment;
+      delete billData.paymentAccounts;
+      delete billData.onlinePayment;
 
       if (editingBill) {
         await billAPI.update(editingBill._id, billData);
@@ -540,6 +544,14 @@ const Bills = () => {
       } else {
         await billAPI.create(billData);
         setMessage({ type: 'success', text: 'Bill created successfully!' });
+
+        if (sourcePurchaseOrderId) {
+          try {
+            await purchaseOrderAPI.delete(sourcePurchaseOrderId);
+          } catch (err) {
+            console.error('Failed to delete purchase order after creating bill:', err);
+          }
+        }
       }
 
       setTimeout(() => {
@@ -550,6 +562,58 @@ const Bills = () => {
       }, 1500);
     } catch (error) {
       console.error('Error saving bill:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save bill' });
+    }
+  };
+
+  // Handle payment submission from modal
+  const handlePaymentSubmit = async (paymentAccounts) => {
+    try {
+      const validLineItems = formData.lineItems.filter(item => item.item && item.item !== '');
+
+      const billData = {
+        ...formData,
+        amountTreatment: formData.taxMode,
+        lineItems: validLineItems.map(item => ({
+          ...item,
+          taxRate: item.taxType,
+          taxType: undefined,
+          account: item.account || undefined,
+        })),
+        status: 'Paid',
+        paymentAccounts,
+      };
+
+      delete billData.taxMode;
+      delete billData.useSplitPayment;
+      delete billData.onlinePayment;
+
+      if (editingBill) {
+        await billAPI.update(editingBill._id, billData);
+        setMessage({ type: 'success', text: 'Payment recorded and bill marked as paid!' });
+      } else {
+        await billAPI.create(billData);
+        setMessage({ type: 'success', text: 'Bill created and marked as paid!' });
+
+        if (sourcePurchaseOrderId) {
+          try {
+            await purchaseOrderAPI.delete(sourcePurchaseOrderId);
+          } catch (err) {
+            console.error('Failed to delete purchase order after creating paid bill:', err);
+          }
+        }
+      }
+
+      setShowPaymentModal(false);
+
+      setTimeout(() => {
+        setView('list');
+        setEditingBill(null);
+        setMessage({ type: '', text: '' });
+        fetchBills();
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving bill with payment:', error);
       setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save bill' });
     }
   };
@@ -604,7 +668,8 @@ const Bills = () => {
               <tr>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Bill #</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Vendor</th>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Date</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Bill Date</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Due Date</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Amount</th>
                 <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Status</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Actions</th>
@@ -613,7 +678,7 @@ const Bills = () => {
             <tbody className="divide-y divide-secondary-100">
               {bills.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center">
+                  <td colSpan="7" className="py-12 text-center">
                     <FileText className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
                     <p className="text-secondary-500">No bills found</p>
                   </td>
@@ -639,20 +704,18 @@ const Bills = () => {
                       </div>
                     </td>
                     <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2 text-sm text-secondary-700">
+                        <Calendar className="w-4 h-4 text-secondary-400" />
+                        <span>{formatDate(bill.dueDate)}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
                       <span className="font-semibold text-secondary-900">{formatCurrency(bill.grandTotal)}</span>
                     </td>
                     <td className="py-2 px-3">
-                      <select
-                        value={bill.status}
-                        onChange={(e) => handleStatusChange(bill._id, e.target.value)}
-                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-red-500 ${getStatusClass(bill.status)}`}
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Sent">Sent</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(bill.status)}`}>
+                        {bill.status}
+                      </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
@@ -695,6 +758,18 @@ const Bills = () => {
             {editingBill ? 'Update bill details' : 'Create a new vendor bill'}
           </p>
         </div>
+        {selectedStatus !== 'Paid' && editingBill?.status !== 'Paid' && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedStatus('Paid');
+              handleSubmit('Paid');
+            }}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
+          >
+            Mark as Paid
+          </button>
+        )}
       </div>
 
       {/* Message */}
@@ -792,8 +867,53 @@ const Bills = () => {
               <select
                 value={formData.taxMode}
                 onChange={(e) => {
-                  setFormData({ ...formData, taxMode: e.target.value });
-                  calculateTotals(formData.lineItems);
+                  const newTaxMode = e.target.value;
+
+                  const updatedLineItems = formData.lineItems.map((line) => {
+                    const qty = parseFloat(line.qty) || 0;
+                    const price = parseFloat(line.price) || 0;
+                    const discountPercent = parseFloat(line.discount) || 0;
+
+                    let taxRate = 0;
+                    if (newTaxMode !== 'No Tax') {
+                      const taxType = taxTypes.find(t => t._id === line.taxType);
+                      taxRate = taxType ? parseFloat(taxType.taxPercentage) / 100 : 0;
+                    }
+
+                    const lineSubtotal = qty * price;
+                    const discountAmount = lineSubtotal * (discountPercent / 100);
+
+                    if (newTaxMode === 'Including' && taxRate > 0) {
+                      const grossAmount = lineSubtotal - discountAmount;
+                      const baseAmount = grossAmount / (1 + taxRate);
+                      const taxAmount = grossAmount - baseAmount;
+
+                      return {
+                        ...line,
+                        taxType: newTaxMode === 'No Tax' ? '' : line.taxType,
+                        amount: baseAmount,
+                        taxAmount,
+                      };
+                    } else {
+                      const lineAmount = lineSubtotal - discountAmount;
+                      const taxAmount = newTaxMode === 'No Tax' ? 0 : lineAmount * taxRate;
+
+                      return {
+                        ...line,
+                        taxType: newTaxMode === 'No Tax' ? '' : line.taxType,
+                        amount: lineAmount,
+                        taxAmount,
+                      };
+                    }
+                  });
+
+                  setFormData(prev => ({
+                    ...prev,
+                    taxMode: newTaxMode,
+                    lineItems: updatedLineItems,
+                  }));
+
+                  calculateTotals(updatedLineItems, newTaxMode);
                 }}
                 required
                 className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
@@ -818,141 +938,6 @@ const Bills = () => {
               className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
             />
           </div>
-        </div>
-
-        {/* Payment Account Section - Compact */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Payment Mode Selector */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Payment Mode
-              </label>
-              <select
-                value={formData.useSplitPayment ? 'split' : 'single'}
-                onChange={(e) => {
-                  const isSplit = e.target.value === 'split';
-                  setFormData({
-                    ...formData,
-                    useSplitPayment: isSplit,
-                    paymentAccounts: isSplit
-                      ? [{ bankAccount: '', amount: formData.grandTotal }]
-                      : [{ bankAccount: '', amount: 0 }],
-                  });
-                }}
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-secondary-900"
-              >
-                <option value="single">Single Account</option>
-                <option value="split">Split Payment</option>
-              </select>
-            </div>
-
-            {/* Single Bank Account or Split Payment Info */}
-            {!formData.useSplitPayment ? (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Bank Account
-                </label>
-                <select
-                  value={formData.onlinePayment}
-                  onChange={(e) => setFormData({ ...formData, onlinePayment: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-secondary-900"
-                >
-                  <option value="">Select bank account (optional)</option>
-                  {bankAccounts.map((account) => (
-                    <option key={account._id} value={account._id}>
-                      {account.bankName} - {account.accountName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Split Accounts
-                </label>
-                <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  <span className="font-semibold text-blue-900">
-                    {formData.paymentAccounts.filter(p => p.bankAccount).length} account(s) configured
-                  </span>
-                  <span className="text-blue-700 ml-2">
-                    {Math.abs(calculateRemainingAmount()) < 0.01 ? '(Complete)' : '(Incomplete)'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Split Payment Details - Only shown when split mode is active */}
-          {formData.useSplitPayment && (
-            <div className="mt-4 p-4 bg-secondary-50 rounded-lg border border-secondary-200">
-              <div className="space-y-3">
-                {formData.paymentAccounts.map((payment, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <div className="flex-1">
-                      <select
-                        value={payment.bankAccount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'bankAccount', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                      >
-                        <option value="">Select bank account...</option>
-                        {bankAccounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.bankName} - {account.accountName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-32">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={payment.amount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'amount', e.target.value)}
-                        placeholder="Amount"
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePaymentAccount(index)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove account"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddPaymentAccount}
-                  className="px-3 py-1.5 bg-white hover:bg-secondary-100 text-secondary-700 rounded-lg font-medium flex items-center space-x-1 transition-all text-sm border border-secondary-300"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Account</span>
-                </button>
-
-                {/* Compact Payment Summary */}
-                <div className="pt-3 border-t border-secondary-300 flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-secondary-700">
-                      Allocated: <span className="font-semibold text-secondary-900">
-                        {formatCurrency(formData.paymentAccounts.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0))}
-                      </span>
-                    </span>
-                    <span className="text-secondary-700">
-                      Total: <span className="font-semibold text-secondary-900">{formatCurrency(formData.grandTotal)}</span>
-                    </span>
-                  </div>
-                  <span className={`font-semibold ${Math.abs(calculateRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                    Remaining: {formatCurrency(calculateRemainingAmount())}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Line Items Section */}
@@ -1124,8 +1109,12 @@ const Bills = () => {
                     {/* Tax Type */}
                     <td className="py-2 px-3">
                       <select
-                        value={line.taxType}
-                        onChange={(e) => handleLineItemChange(index, 'taxType', e.target.value)}
+                        value={formData.taxMode === 'No Tax' ? '' : line.taxType}
+                        onChange={(e) => {
+                          if (formData.taxMode === 'No Tax') return;
+                          handleLineItemChange(index, 'taxType', e.target.value);
+                        }}
+                        disabled={formData.taxMode === 'No Tax'}
                         className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
                       >
                         <option value="">No tax</option>
@@ -1215,17 +1204,37 @@ const Bills = () => {
           >
             Cancel
           </button>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-semibold text-secondary-900"
-          >
-            <option value="Draft">Draft</option>
-            <option value="Sent">Sent</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+          {(() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDate = formData.dueDate ? new Date(formData.dueDate) : null;
+            if (dueDate) dueDate.setHours(0, 0, 0, 0);
+            const isOverdueAndPast = editingBill?.status === 'Overdue' && dueDate && dueDate < today;
+
+            if (isOverdueAndPast) {
+              return (
+                <select
+                  value={selectedStatus === 'Overdue' ? 'Paid' : selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-semibold text-secondary-900"
+                >
+                  <option value="Paid">Paid</option>
+                </select>
+              );
+            }
+
+            return (
+              <select
+                value={selectedStatus === 'Overdue' ? 'Payment Pending' : selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-semibold text-secondary-900"
+              >
+                <option value="Draft">Draft</option>
+                <option value="Payment Pending">Payment Pending</option>
+                <option value="Paid">Paid</option>
+              </select>
+            );
+          })()}
           <button
             type="button"
             onClick={() => handleSubmit(selectedStatus)}
@@ -1256,6 +1265,19 @@ const Bills = () => {
         show={showAccountModal}
         onClose={() => setShowAccountModal(false)}
         onSuccess={handleAccountSuccess}
+      />
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+        }}
+        invoice={{
+          invoiceNumber: editingBill?.billNumber || formData.billNumber,
+          grandTotal: formData.grandTotal,
+        }}
+        bankAccounts={bankAccounts}
+        onSubmit={handlePaymentSubmit}
       />
     </div>
   );

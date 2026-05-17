@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 
@@ -117,9 +117,13 @@ const Login = () => {
                 />
                 <span className="text-sm text-secondary-600">Remember me</span>
               </label>
-              <a href="#" className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors">
+              <button
+                type="button"
+                onClick={() => alert('Contact admin to reset password')}
+                className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors bg-none border-none p-0 cursor-pointer"
+              >
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             {/* Submit Button */}

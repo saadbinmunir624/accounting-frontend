@@ -19,16 +19,20 @@ import Quotation from './pages/Sales/Quotation';
 import Bills from './pages/Purchase/Bills';
 import PurchaseOrder from './pages/Purchase/PurchaseOrder';
 
+// Banking Pages
+import SendMoney from './pages/Banking/SendMoney';
+import ReceiveMoney from './pages/Banking/ReceiveMoney';
+
 // Contacts
 import Contacts from './pages/Contacts/Contacts';
 
 // Accounts Pages
 import ChartOfAccounts from './pages/Accounts/ChartOfAccounts';
 import BankAccount from './pages/Accounts/BankAccount';
+import BankAccountTypes from './pages/Accounts/BankAccountTypes';
 
 // Manage Pages
-import AccountType from './pages/Accounts/AccountType';
-import BankAccountTypes from './pages/Accounts/BankAccountTypes';
+
 import TaxTypes from './pages/Accounts/TaxTypes';
 import Items from './pages/Manage/Items';
 import Users from './pages/Manage/Users';
@@ -67,6 +71,10 @@ function App() {
                     <Route path="/purchase/bills" element={<Bills />} />
                     <Route path="/purchase/orders" element={<PurchaseOrder />} />
 
+                    {/* Banking */}
+                    <Route path="/banking/send-money" element={<SendMoney />} />
+                    <Route path="/banking/receive-money" element={<ReceiveMoney />} />
+
                     {/* Contacts */}
                     <Route path="/contacts" element={<Contacts />} />
 
@@ -77,13 +85,10 @@ function App() {
                     {/* Reports */}
                     <Route path="/reports" element={<Reports />} />
 
-                    {/* Accounts - Account Types, Bank Account Types, Tax Types */}
-                    <Route path="/accounts/account-types" element={<AccountType />} />
-                    <Route path="/accounts/bank-account-types" element={<BankAccountTypes />} />
+                    {/* Accounts - Tax Types */}
                     <Route path="/accounts/tax-types" element={<TaxTypes />} />
 
                     {/* Manage */}
-                    <Route path="/manage/account-types" element={<AccountType />} />
                     <Route path="/manage/bank-account-types" element={<BankAccountTypes />} />
                     <Route path="/manage/tax-types" element={<TaxTypes />} />
                     <Route path="/manage/items" element={<Items />} />

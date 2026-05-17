@@ -12,7 +12,8 @@ import {
   ChevronDown,
   Menu,
   X,
-  BarChart3
+  BarChart3,
+  Plus
 } from 'lucide-react';
 
 const TopNavbar = () => {
@@ -22,6 +23,7 @@ const TopNavbar = () => {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [profileDropdown, setProfileDropdown] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const menuItems = [
@@ -71,7 +73,6 @@ const TopNavbar = () => {
       name: 'Manage',
       icon: Settings,
       dropdownItems: [
-        { name: 'Account Types', path: '/manage/account-types' },
         { name: 'Bank Account Types', path: '/manage/bank-account-types' },
         { name: 'Tax Types', path: '/manage/tax-types' },
         { name: 'Items', path: '/manage/items' },
@@ -86,6 +87,7 @@ const TopNavbar = () => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setActiveDropdown(null);
         setProfileDropdown(false);
+        setQuickActionsOpen(false);
       }
     };
 
@@ -107,11 +109,13 @@ const TopNavbar = () => {
   const toggleDropdown = (menuName) => {
     setActiveDropdown(activeDropdown === menuName ? null : menuName);
     setProfileDropdown(false);
+    setQuickActionsOpen(false);
   };
 
   const toggleProfileDropdown = () => {
     setProfileDropdown(!profileDropdown);
     setActiveDropdown(null);
+    setQuickActionsOpen(false);
   };
 
   const isActiveLink = (path) => {
@@ -207,6 +211,66 @@ const TopNavbar = () => {
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
+
+            {/* Quick Actions (Desktop) */}
+            <div className="relative hidden lg:block">
+              <button
+                onClick={() => {
+                  setQuickActionsOpen(!quickActionsOpen);
+                  setProfileDropdown(false);
+                  setActiveDropdown(null);
+                }}
+                className="p-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-colors flex items-center justify-center"
+                title="Quick actions"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+
+              {quickActionsOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-large border border-secondary-200 py-2 animate-scaleIn z-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickActionsOpen(false);
+                      navigate('/sales/invoices', { state: { openInvoiceForm: true } });
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-secondary-700 hover:text-primary-600 hover:bg-secondary-50 transition-colors"
+                  >
+                    Create Invoice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickActionsOpen(false);
+                      navigate('/purchase/bills', { state: { openBillForm: true } });
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-secondary-700 hover:text-primary-600 hover:bg-secondary-50 transition-colors"
+                  >
+                    Create Bill
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickActionsOpen(false);
+                      navigate('/banking/send-money');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-secondary-700 hover:text-primary-600 hover:bg-secondary-50 transition-colors"
+                  >
+                    Send Money
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickActionsOpen(false);
+                      navigate('/banking/receive-money');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-secondary-700 hover:text-primary-600 hover:bg-secondary-50 transition-colors"
+                  >
+                    Receive Money
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Profile Dropdown */}
             <div className="relative">

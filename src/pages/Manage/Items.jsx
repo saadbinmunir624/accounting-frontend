@@ -117,24 +117,6 @@ const Items = () => {
     }));
   };
 
-  const getAccountName = (item, field) => {
-    if (!item[field]) return '-';
-    if (typeof item[field] === 'object' && item[field]?.name) {
-      return item[field].name;
-    }
-    const account = accounts.find((a) => a._id === item[field]);
-    return account?.name || '-';
-  };
-
-  const getTaxTypeName = (item, field) => {
-    if (!item[field]) return '-';
-    if (typeof item[field] === 'object' && item[field]?.name) {
-      return item[field].name;
-    }
-    const tax = taxTypes.find((t) => t._id === item[field]);
-    return tax?.name || '-';
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 

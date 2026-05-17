@@ -12,16 +12,16 @@ import {
   ShoppingBag,
   Percent,
   FileBarChart,
+  Briefcase,
+  Building2,
+  CreditCard,
+  Package,
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import {
-  salesInvoiceAPI,
-  billAPI,
-  contactAPI,
-  taxTypeAPI,
-  chartOfAccountsAPI,
-} from '../../services/api';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:5000/api/reports';
 
 const Reports = () => {
   const [selectedCategory, setSelectedCategory] = useState('financial');
@@ -30,13 +30,61 @@ const Reports = () => {
   const [endDate, setEndDate] = useState(new Date());
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({
+    contactId: '',
+    accountId: '',
+    bankAccountId: '',
+    itemId: '',
+    status: '',
+  });
+  const [filterOptions, setFilterOptions] = useState({
+    contacts: [],
+    accounts: [],
+    bankAccounts: [],
+    items: [],
+  });
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
+
+  const fetchFilterOptions = async () => {
+    try {
+      const [contacts, accounts, bankAccounts, items] = await Promise.all([
+        axios.get('http://localhost:5000/api/contacts').catch(e => ({ data: [] })),
+        axios.get('http://localhost:5000/api/chart-of-accounts').catch(e => ({ data: [] })),
+        axios.get('http://localhost:5000/api/bank-accounts').catch(e => ({ data: [] })),
+        axios.get('http://localhost:5000/api/items').catch(e => ({ data: [] })),
+      ]);
+
+      setFilterOptions({
+        contacts: Array.isArray(contacts.data) ? contacts.data : [],
+        accounts: Array.isArray(accounts.data) ? accounts.data : [],
+        bankAccounts: Array.isArray(bankAccounts.data) ? bankAccounts.data : [],
+        items: Array.isArray(items.data) ? items.data : [],
+      });
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+      // Set empty arrays as fallback
+      setFilterOptions({
+        contacts: [],
+        accounts: [],
+        bankAccounts: [],
+        items: [],
+      });
+    }
+  };
 
   const reportCategories = [
     { id: 'financial', name: 'Financial Reports', icon: Scale },
     { id: 'sales', name: 'Sales Reports', icon: ShoppingCart },
     { id: 'purchase', name: 'Purchase Reports', icon: ShoppingBag },
+    { id: 'contacts', name: 'Reports by Contacts', icon: Users },
+    { id: 'accounts', name: 'Reports by Accounts', icon: Briefcase },
+    { id: 'bankAccounts', name: 'Reports by Bank Accounts', icon: Building2 },
+    { id: 'items', name: 'Reports by Items', icon: Package },
     { id: 'tax', name: 'Tax Reports', icon: Percent },
-    { id: 'contacts', name: 'Contact Reports', icon: Users },
   ];
 
   const reports = {
@@ -44,33 +92,49 @@ const Reports = () => {
       { id: 'profit-loss', name: 'Profit & Loss Statement', icon: TrendingUp },
       { id: 'balance-sheet', name: 'Balance Sheet', icon: Scale },
       { id: 'cash-flow', name: 'Cash Flow Statement', icon: BarChart3 },
-      { id: 'trial-balance', name: 'Trial Balance', icon: FileBarChart },
+      { id: 'income-statement', name: 'Income Statement', icon: FileBarChart },
     ],
     sales: [
       { id: 'sales-summary', name: 'Sales Summary', icon: DollarSign },
       { id: 'sales-by-customer', name: 'Sales by Customer', icon: Users },
-      { id: 'sales-by-item', name: 'Sales by Item', icon: FileText },
       { id: 'invoice-details', name: 'Invoice Details', icon: FileText },
-      { id: 'customer-balance', name: 'Customer Balance Summary', icon: DollarSign },
+      { id: 'customer-balance', name: 'Customer Balance', icon: DollarSign },
       { id: 'aged-receivables', name: 'Aged Receivables', icon: Calendar },
     ],
     purchase: [
       { id: 'purchase-summary', name: 'Purchase Summary', icon: DollarSign },
       { id: 'purchase-by-vendor', name: 'Purchase by Vendor', icon: Users },
-      { id: 'purchase-by-item', name: 'Purchase by Item', icon: FileText },
       { id: 'bill-details', name: 'Bill Details', icon: FileText },
-      { id: 'vendor-balance', name: 'Vendor Balance Summary', icon: DollarSign },
+      { id: 'vendor-balance', name: 'Vendor Balance', icon: DollarSign },
       { id: 'aged-payables', name: 'Aged Payables', icon: Calendar },
+    ],
+    contacts: [
+      { id: 'contact-transactions', name: 'Contact Transactions', icon: CreditCard },
+      { id: 'contact-summary', name: 'Contact Summary', icon: Users },
+      { id: 'customer-transactions', name: 'Customer Transactions', icon: ShoppingCart },
+      { id: 'vendor-transactions', name: 'Vendor Transactions', icon: ShoppingBag },
+    ],
+    accounts: [
+      { id: 'account-activity', name: 'Account Activity', icon: Briefcase },
+      { id: 'account-balance', name: 'Account Balance', icon: DollarSign },
+      { id: 'account-transactions', name: 'Account Transactions', icon: CreditCard },
+      { id: 'trial-balance', name: 'Trial Balance', icon: FileBarChart },
+    ],
+    bankAccounts: [
+      { id: 'bank-account-activity', name: 'Bank Account Activity', icon: Building2 },
+      { id: 'bank-account-balance', name: 'Bank Account Balance', icon: DollarSign },
+      { id: 'bank-reconciliation', name: 'Bank Reconciliation', icon: Scale },
+    ],
+    items: [
+      { id: 'item-sales', name: 'Item Sales Report', icon: ShoppingCart },
+      { id: 'item-purchases', name: 'Item Purchases Report', icon: ShoppingBag },
+      { id: 'item-summary', name: 'Item Summary', icon: Package },
+      { id: 'item-movement', name: 'Item Movement', icon: TrendingUp },
     ],
     tax: [
       { id: 'tax-summary', name: 'Tax Summary', icon: Percent },
       { id: 'sales-tax', name: 'Sales Tax Report', icon: ShoppingCart },
       { id: 'purchase-tax', name: 'Purchase Tax Report', icon: ShoppingBag },
-    ],
-    contacts: [
-      { id: 'contact-list', name: 'Contact List', icon: Users },
-      { id: 'customer-statement', name: 'Customer Statement', icon: FileText },
-      { id: 'vendor-statement', name: 'Vendor Statement', icon: FileText },
     ],
   };
 
@@ -79,522 +143,29 @@ const Reports = () => {
 
     setLoading(true);
     try {
-      let data = null;
+      const queryParams = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
 
-      switch (selectedReport.id) {
-        case 'profit-loss':
-          data = await generateProfitLoss();
-          break;
-        case 'sales-summary':
-          data = await generateSalesSummary();
-          break;
-        case 'sales-by-customer':
-          data = await generateSalesByCustomer();
-          break;
-        case 'invoice-details':
-          data = await generateInvoiceDetails();
-          break;
-        case 'purchase-summary':
-          data = await generatePurchaseSummary();
-          break;
-        case 'purchase-by-vendor':
-          data = await generatePurchaseByVendor();
-          break;
-        case 'bill-details':
-          data = await generateBillDetails();
-          break;
-        case 'customer-balance':
-          data = await generateCustomerBalance();
-          break;
-        case 'vendor-balance':
-          data = await generateVendorBalance();
-          break;
-        case 'aged-receivables':
-          data = await generateAgedReceivables();
-          break;
-        case 'aged-payables':
-          data = await generateAgedPayables();
-          break;
-        case 'tax-summary':
-          data = await generateTaxSummary();
-          break;
-        case 'sales-tax':
-          data = await generateSalesTax();
-          break;
-        case 'purchase-tax':
-          data = await generatePurchaseTax();
-          break;
-        case 'contact-list':
-          data = await generateContactList();
-          break;
-        default:
-          data = { message: 'Report generation coming soon' };
-      }
+      if (filters.contactId) queryParams.append('contactId', filters.contactId);
+      if (filters.accountId) queryParams.append('accountId', filters.accountId);
+      if (filters.bankAccountId) queryParams.append('bankAccountId', filters.bankAccountId);
+      if (filters.itemId) queryParams.append('itemId', filters.itemId);
+      if (filters.status) queryParams.append('status', filters.status);
 
-      setReportData(data);
+      const response = await axios.get(
+        `${API_BASE_URL}/${selectedReport.id}?${queryParams.toString()}`
+      );
+      
+      setReportData(response.data);
     } catch (error) {
       console.error('Error generating report:', error);
-      setReportData({ error: 'Failed to generate report' });
+      setReportData({ error: error.response?.data?.message || 'Failed to generate report' });
     } finally {
       setLoading(false);
     }
   };
-
-  // Report Generation Functions
-  const generateProfitLoss = async () => {
-    const invoicesRes = await salesInvoiceAPI.getAll();
-    const billsRes = await billAPI.getAll();
-
-    const invoices = invoicesRes.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    const bills = billsRes.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
-    const totalExpenses = bills.reduce((sum, bill) => sum + (bill.grandTotal || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
-
-    return {
-      type: 'profit-loss',
-      revenue: totalRevenue,
-      expenses: totalExpenses,
-      netProfit,
-      invoiceCount: invoices.length,
-      billCount: bills.length,
-    };
-  };
-
-  const generateSalesSummary = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const invoices = res.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    const totalSales = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
-    const totalTax = invoices.reduce((sum, inv) => sum + (inv.totalTax || 0), 0);
-    const paidInvoices = invoices.filter((inv) => inv.status === 'Paid');
-    const unpaidInvoices = invoices.filter((inv) => inv.status === 'Unpaid');
-    const totalPaid = paidInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
-    const totalUnpaid = unpaidInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
-
-    return {
-      type: 'sales-summary',
-      totalSales,
-      totalTax,
-      totalPaid,
-      totalUnpaid,
-      invoiceCount: invoices.length,
-      paidCount: paidInvoices.length,
-      unpaidCount: unpaidInvoices.length,
-    };
-  };
-
-  const generateSalesByCustomer = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const invoices = res.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    const customerSales = {};
-    invoices.forEach((inv) => {
-      const customerId = inv.customer?._id || 'Unknown';
-      const customerName = inv.customer?.name || 'Unknown Customer';
-
-      if (!customerSales[customerId]) {
-        customerSales[customerId] = {
-          name: customerName,
-          totalSales: 0,
-          invoiceCount: 0,
-        };
-      }
-
-      customerSales[customerId].totalSales += inv.grandTotal || 0;
-      customerSales[customerId].invoiceCount += 1;
-    });
-
-    return {
-      type: 'sales-by-customer',
-      customers: Object.values(customerSales).sort((a, b) => b.totalSales - a.totalSales),
-    };
-  };
-
-  const generateInvoiceDetails = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const invoices = res.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    return {
-      type: 'invoice-details',
-      invoices: invoices.map((inv) => ({
-        number: inv.invoiceNumber,
-        date: new Date(inv.issueDate).toLocaleDateString(),
-        customer: inv.customer?.name || 'Unknown',
-        status: inv.status,
-        subtotal: inv.subtotal || 0,
-        tax: inv.totalTax || 0,
-        total: inv.grandTotal || 0,
-      })),
-    };
-  };
-
-  const generatePurchaseSummary = async () => {
-    const res = await billAPI.getAll();
-    const bills = res.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    const totalPurchases = bills.reduce((sum, bill) => sum + (bill.grandTotal || 0), 0);
-    const totalTax = bills.reduce((sum, bill) => sum + (bill.totalTax || 0), 0);
-    const paidBills = bills.filter((bill) => bill.status === 'Paid');
-    const unpaidBills = bills.filter((bill) => bill.status === 'Unpaid');
-    const totalPaid = paidBills.reduce((sum, bill) => sum + (bill.grandTotal || 0), 0);
-    const totalUnpaid = unpaidBills.reduce((sum, bill) => sum + (bill.grandTotal || 0), 0);
-
-    return {
-      type: 'purchase-summary',
-      totalPurchases,
-      totalTax,
-      totalPaid,
-      totalUnpaid,
-      billCount: bills.length,
-      paidCount: paidBills.length,
-      unpaidCount: unpaidBills.length,
-    };
-  };
-
-  const generatePurchaseByVendor = async () => {
-    const res = await billAPI.getAll();
-    const bills = res.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    const vendorPurchases = {};
-    bills.forEach((bill) => {
-      const vendorId = bill.vendor?._id || 'Unknown';
-      const vendorName = bill.vendor?.name || 'Unknown Vendor';
-
-      if (!vendorPurchases[vendorId]) {
-        vendorPurchases[vendorId] = {
-          name: vendorName,
-          totalPurchases: 0,
-          billCount: 0,
-        };
-      }
-
-      vendorPurchases[vendorId].totalPurchases += bill.grandTotal || 0;
-      vendorPurchases[vendorId].billCount += 1;
-    });
-
-    return {
-      type: 'purchase-by-vendor',
-      vendors: Object.values(vendorPurchases).sort((a, b) => b.totalPurchases - a.totalPurchases),
-    };
-  };
-
-  const generateBillDetails = async () => {
-    const res = await billAPI.getAll();
-    const bills = res.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    return {
-      type: 'bill-details',
-      bills: bills.map((bill) => ({
-        number: bill.billNumber,
-        date: new Date(bill.issueDate).toLocaleDateString(),
-        vendor: bill.vendor?.name || 'Unknown',
-        status: bill.status,
-        subtotal: bill.subtotal || 0,
-        tax: bill.totalTax || 0,
-        total: bill.grandTotal || 0,
-      })),
-    };
-  };
-
-  const generateCustomerBalance = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const invoices = res.data;
-
-    const customerBalances = {};
-    invoices.forEach((inv) => {
-      const customerId = inv.customer?._id || 'Unknown';
-      const customerName = inv.customer?.name || 'Unknown Customer';
-
-      if (!customerBalances[customerId]) {
-        customerBalances[customerId] = {
-          name: customerName,
-          totalInvoiced: 0,
-          totalPaid: 0,
-          balance: 0,
-        };
-      }
-
-      customerBalances[customerId].totalInvoiced += inv.grandTotal || 0;
-      if (inv.status === 'Paid') {
-        customerBalances[customerId].totalPaid += inv.grandTotal || 0;
-      }
-    });
-
-    Object.keys(customerBalances).forEach((id) => {
-      customerBalances[id].balance =
-        customerBalances[id].totalInvoiced - customerBalances[id].totalPaid;
-    });
-
-    return {
-      type: 'customer-balance',
-      customers: Object.values(customerBalances)
-        .filter((c) => c.balance > 0)
-        .sort((a, b) => b.balance - a.balance),
-    };
-  };
-
-  const generateVendorBalance = async () => {
-    const res = await billAPI.getAll();
-    const bills = res.data;
-
-    const vendorBalances = {};
-    bills.forEach((bill) => {
-      const vendorId = bill.vendor?._id || 'Unknown';
-      const vendorName = bill.vendor?.name || 'Unknown Vendor';
-
-      if (!vendorBalances[vendorId]) {
-        vendorBalances[vendorId] = {
-          name: vendorName,
-          totalBilled: 0,
-          totalPaid: 0,
-          balance: 0,
-        };
-      }
-
-      vendorBalances[vendorId].totalBilled += bill.grandTotal || 0;
-      if (bill.status === 'Paid') {
-        vendorBalances[vendorId].totalPaid += bill.grandTotal || 0;
-      }
-    });
-
-    Object.keys(vendorBalances).forEach((id) => {
-      vendorBalances[id].balance = vendorBalances[id].totalBilled - vendorBalances[id].totalPaid;
-    });
-
-    return {
-      type: 'vendor-balance',
-      vendors: Object.values(vendorBalances)
-        .filter((v) => v.balance > 0)
-        .sort((a, b) => b.balance - a.balance),
-    };
-  };
-
-  const generateAgedReceivables = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const unpaidInvoices = res.data.filter((inv) => inv.status === 'Unpaid');
-
-    const aging = {
-      current: [],
-      days30: [],
-      days60: [],
-      days90: [],
-      days90Plus: [],
-    };
-
-    const today = new Date();
-    unpaidInvoices.forEach((inv) => {
-      const dueDate = new Date(inv.dueDate);
-      const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-
-      const invData = {
-        customer: inv.customer?.name || 'Unknown',
-        invoiceNumber: inv.invoiceNumber,
-        amount: inv.grandTotal || 0,
-        daysOverdue,
-      };
-
-      if (daysOverdue <= 0) {
-        aging.current.push(invData);
-      } else if (daysOverdue <= 30) {
-        aging.days30.push(invData);
-      } else if (daysOverdue <= 60) {
-        aging.days60.push(invData);
-      } else if (daysOverdue <= 90) {
-        aging.days90.push(invData);
-      } else {
-        aging.days90Plus.push(invData);
-      }
-    });
-
-    return {
-      type: 'aged-receivables',
-      aging,
-      totals: {
-        current: aging.current.reduce((sum, inv) => sum + inv.amount, 0),
-        days30: aging.days30.reduce((sum, inv) => sum + inv.amount, 0),
-        days60: aging.days60.reduce((sum, inv) => sum + inv.amount, 0),
-        days90: aging.days90.reduce((sum, inv) => sum + inv.amount, 0),
-        days90Plus: aging.days90Plus.reduce((sum, inv) => sum + inv.amount, 0),
-      },
-    };
-  };
-
-  const generateAgedPayables = async () => {
-    const res = await billAPI.getAll();
-    const unpaidBills = res.data.filter((bill) => bill.status === 'Unpaid');
-
-    const aging = {
-      current: [],
-      days30: [],
-      days60: [],
-      days90: [],
-      days90Plus: [],
-    };
-
-    const today = new Date();
-    unpaidBills.forEach((bill) => {
-      const dueDate = new Date(bill.dueDate);
-      const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-
-      const billData = {
-        vendor: bill.vendor?.name || 'Unknown',
-        billNumber: bill.billNumber,
-        amount: bill.grandTotal || 0,
-        daysOverdue,
-      };
-
-      if (daysOverdue <= 0) {
-        aging.current.push(billData);
-      } else if (daysOverdue <= 30) {
-        aging.days30.push(billData);
-      } else if (daysOverdue <= 60) {
-        aging.days60.push(billData);
-      } else if (daysOverdue <= 90) {
-        aging.days90.push(billData);
-      } else {
-        aging.days90Plus.push(billData);
-      }
-    });
-
-    return {
-      type: 'aged-payables',
-      aging,
-      totals: {
-        current: aging.current.reduce((sum, bill) => sum + bill.amount, 0),
-        days30: aging.days30.reduce((sum, bill) => sum + bill.amount, 0),
-        days60: aging.days60.reduce((sum, bill) => sum + bill.amount, 0),
-        days90: aging.days90.reduce((sum, bill) => sum + bill.amount, 0),
-        days90Plus: aging.days90Plus.reduce((sum, bill) => sum + bill.amount, 0),
-      },
-    };
-  };
-
-  const generateTaxSummary = async () => {
-    const invoicesRes = await salesInvoiceAPI.getAll();
-    const billsRes = await billAPI.getAll();
-
-    const invoices = invoicesRes.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    const bills = billsRes.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    const salesTax = invoices.reduce((sum, inv) => sum + (inv.totalTax || 0), 0);
-    const purchaseTax = bills.reduce((sum, bill) => sum + (bill.totalTax || 0), 0);
-    const netTax = salesTax - purchaseTax;
-
-    return {
-      type: 'tax-summary',
-      salesTax,
-      purchaseTax,
-      netTax,
-      salesCount: invoices.length,
-      purchaseCount: bills.length,
-    };
-  };
-
-  const generateSalesTax = async () => {
-    const res = await salesInvoiceAPI.getAll();
-    const invoices = res.data.filter((inv) => {
-      const invDate = new Date(inv.issueDate);
-      return invDate >= startDate && invDate <= endDate;
-    });
-
-    const taxDetails = invoices.map((inv) => ({
-      invoiceNumber: inv.invoiceNumber,
-      customer: inv.customer?.name || 'Unknown',
-      date: new Date(inv.issueDate).toLocaleDateString(),
-      subtotal: inv.subtotal || 0,
-      tax: inv.totalTax || 0,
-      total: inv.grandTotal || 0,
-    }));
-
-    const totalTax = invoices.reduce((sum, inv) => sum + (inv.totalTax || 0), 0);
-
-    return {
-      type: 'sales-tax',
-      taxDetails,
-      totalTax,
-    };
-  };
-
-  const generatePurchaseTax = async () => {
-    const res = await billAPI.getAll();
-    const bills = res.data.filter((bill) => {
-      const billDate = new Date(bill.issueDate);
-      return billDate >= startDate && billDate <= endDate;
-    });
-
-    const taxDetails = bills.map((bill) => ({
-      billNumber: bill.billNumber,
-      vendor: bill.vendor?.name || 'Unknown',
-      date: new Date(bill.issueDate).toLocaleDateString(),
-      subtotal: bill.subtotal || 0,
-      tax: bill.totalTax || 0,
-      total: bill.grandTotal || 0,
-    }));
-
-    const totalTax = bills.reduce((sum, bill) => sum + (bill.totalTax || 0), 0);
-
-    return {
-      type: 'purchase-tax',
-      taxDetails,
-      totalTax,
-    };
-  };
-
-  const generateContactList = async () => {
-    const res = await contactAPI.getAll();
-    const contacts = res.data;
-
-    return {
-      type: 'contact-list',
-      contacts: contacts.map((c) => ({
-        name: c.name,
-        type: c.type,
-        email: c.email,
-        phone: c.phone,
-        company: c.company,
-      })),
-    };
-  };
-
-  useEffect(() => {
-    if (selectedReport) {
-      generateReport();
-    }
-  }, [selectedReport, startDate, endDate]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -602,6 +173,16 @@ const Reports = () => {
       currency: 'USD',
     }).format(amount);
   };
+
+  // Automatically generate the selected report when filters change.
+  // We intentionally omit `generateReport` from the dependency list
+  // to avoid recreating it on every render and re-triggering this effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (selectedReport) {
+      generateReport();
+    }
+  }, [selectedReport, startDate, endDate, filters]);
 
   const renderReportContent = () => {
     if (!reportData) {
@@ -1458,6 +1039,247 @@ const Reports = () => {
           </div>
         );
 
+      // Contact Reports
+      case 'contact-transactions':
+      case 'customer-transactions':
+      case 'vendor-transactions':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.transactions?.map((txn, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm">{txn.type}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{txn.number}</td>
+                    <td className="px-6 py-4 text-sm">{txn.contact || txn.customer || txn.vendor}</td>
+                    <td className="px-6 py-4 text-sm">{new Date(txn.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-emerald-600">{formatCurrency(txn.amount)}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        txn.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {txn.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      case 'contact-summary':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bills</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Transactions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.contacts?.map((contact, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium">{contact.name}</td>
+                    <td className="px-6 py-4 text-sm">{contact.type}</td>
+                    <td className="px-6 py-4 text-sm">{contact.invoiceCount}</td>
+                    <td className="px-6 py-4 text-sm">{contact.billCount}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{contact.totalTransactions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      // Account Reports
+      case 'account-activity':
+      case 'account-balance':
+      case 'trial-balance':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.accounts?.map((account, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium">{account.code}</td>
+                    <td className="px-6 py-4 text-sm">{account.name}</td>
+                    <td className="px-6 py-4 text-sm">{account.accountType?.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{account.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      case 'account-transactions':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.transactions?.map((txn, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm">{txn.type}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{txn.number}</td>
+                    <td className="px-6 py-4 text-sm">{new Date(txn.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-emerald-600">{formatCurrency(txn.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      // Bank Account Reports
+      case 'bank-account-activity':
+      case 'bank-account-balance':
+      case 'bank-reconciliation':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Type</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.accounts?.map((account, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm">{account.bankName}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{account.accountName}</td>
+                    <td className="px-6 py-4 text-sm">{account.bankAccountType?.accountTypeName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      // Item Reports
+      case 'item-sales':
+      case 'item-purchases':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {(reportData.sales || reportData.purchases || []).map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium">{item.itemCode}</td>
+                    <td className="px-6 py-4 text-sm">{item.itemName}</td>
+                    <td className="px-6 py-4 text-sm">{item.quantity}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-emerald-600">{formatCurrency(item.totalAmount)}</td>
+                    <td className="px-6 py-4 text-sm">{item.transactions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      case 'item-summary':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold Qty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchased Qty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.items?.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium">{item.itemCode}</td>
+                    <td className="px-6 py-4 text-sm">{item.name}</td>
+                    <td className="px-6 py-4 text-sm">{formatCurrency(item.costPrice)}</td>
+                    <td className="px-6 py-4 text-sm">{formatCurrency(item.salePrice)}</td>
+                    <td className="px-6 py-4 text-sm">{item.soldQuantity}</td>
+                    <td className="px-6 py-4 text-sm">{item.purchasedQuantity}</td>
+                    <td className={`px-6 py-4 text-sm font-medium ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(item.profit)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      case 'item-movement':
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData.movements?.map((movement, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm">{movement.type}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{movement.number}</td>
+                    <td className="px-6 py-4 text-sm">{new Date(movement.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-sm">{movement.quantity}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-emerald-600">{formatCurrency(movement.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
       default:
         return (
           <div className="text-center py-12 text-gray-500">
@@ -1550,7 +1372,7 @@ const Reports = () => {
                 </div>
 
                 {/* Date Range Selector */}
-                <div className="flex items-center space-x-4 pt-4 border-t">
+                <div className="flex items-center space-x-4 pt-4 border-t pb-4">
                   <div className="flex items-center space-x-2">
                     <Calendar size={18} className="text-gray-500" />
                     <span className="text-sm text-gray-600 font-medium">Date Range:</span>
@@ -1576,6 +1398,76 @@ const Reports = () => {
                       dateFormat="MMM dd, yyyy"
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
+                  </div>
+                </div>
+
+                {/* Filters Section */}
+                <div className="pt-4 border-t">
+                  <div className="grid grid-cols-4 gap-4">
+                    {/* Status Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-2">Status</label>
+                      <select
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">All Status</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Unpaid">Unpaid</option>
+                      </select>
+                    </div>
+
+                    {/* Contact Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-2">Contact</label>
+                      <select
+                        value={filters.contactId}
+                        onChange={(e) => setFilters({ ...filters, contactId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">All Contacts</option>
+                        {filterOptions.contacts?.length > 0 && filterOptions.contacts.map((contact) => (
+                          <option key={contact._id} value={contact._id}>
+                            {contact.contactName || contact.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Account Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-2">Account</label>
+                      <select
+                        value={filters.accountId}
+                        onChange={(e) => setFilters({ ...filters, accountId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">All Accounts</option>
+                        {filterOptions.accounts?.length > 0 && filterOptions.accounts.map((account) => (
+                          <option key={account._id} value={account._id}>
+                            {account.code} - {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Item Filter */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-2">Item</label>
+                      <select
+                        value={filters.itemId}
+                        onChange={(e) => setFilters({ ...filters, itemId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">All Items</option>
+                        {filterOptions.items?.length > 0 && filterOptions.items.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.itemCode} - {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>

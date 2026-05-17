@@ -46,7 +46,10 @@ const Contacts = () => {
   });
   const [sameAsBilling, setSameAsBilling] = useState(false);
 
-  // Fetch contacts on mount and when filter changes
+  // Fetch contacts on mount and when filter changes.
+  // We only want this effect to re-run when `filterType` changes,
+  // not on every render when `fetchContacts` is re-created.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchContacts();
   }, [filterType]);

@@ -1,14 +1,12 @@
 // PurchaseOrder.jsx - Purchase Orders to Vendors
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Calendar,
-  FileText,
-  CheckCircle,
-  AlertCircle
+  FileText
 } from 'lucide-react';
 import {
   purchaseOrderAPI,
@@ -22,6 +20,7 @@ import ItemFormModal from '../../components/Forms/ItemFormModal';
 import AccountFormModal from '../../components/Forms/AccountFormModal';
 
 const PurchaseOrder = () => {
+  const navigate = useNavigate();
   // View state
   const [view, setView] = useState('list'); // 'list' or 'form'
   const [editingPO, setEditingPO] = useState(null);
@@ -35,6 +34,7 @@ const PurchaseOrder = () => {
   const [accounts, setAccounts] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isApproving, setIsApproving] = useState(false);
 
   // Modal states
   const [showContactModal, setShowContactModal] = useState(false);
@@ -215,6 +215,33 @@ const PurchaseOrder = () => {
     setView('list');
     setEditingPO(null);
     setMessage({ type: '', text: '' });
+  };
+
+  const handleApproveClick = () => {
+    const validLineItems = formData.lineItems.filter(item => item.item && item.item !== '');
+
+    if (validLineItems.length === 0) {
+      setMessage({ type: 'error', text: 'Please add at least one line item with an item selected before approving' });
+      return;
+    }
+
+    const purchaseOrderPayload = {
+      ...formData,
+      lineItems: validLineItems,
+      status: selectedStatus,
+    };
+
+    setIsApproving(true);
+
+    setTimeout(() => {
+      navigate('/purchase/bills', {
+        state: {
+          fromPurchaseOrder: true,
+          purchaseOrderId: editingPO?._id || null,
+          purchaseOrder: purchaseOrderPayload,
+        },
+      });
+    }, 1000);
   };
 
   const handleDeletePO = async (id) => {
@@ -548,15 +575,9 @@ const PurchaseOrder = () => {
                       <span className="font-semibold text-secondary-900">{formatCurrency(po.grandTotal)}</span>
                     </td>
                     <td className="py-2 px-3">
-                      <select
-                        value={po.status}
-                        onChange={(e) => handleStatusChange(po._id, e.target.value)}
-                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusClass(po.status)}`}
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Sent">Sent</option>
-                        <option value="Approved">Approved</option>
-                      </select>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(po.status)}`}>
+                        {po.status}
+                      </span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
@@ -599,6 +620,15 @@ const PurchaseOrder = () => {
             {editingPO ? 'Update purchase order details' : 'Create a new purchase order'}
           </p>
         </div>
+        {(!editingPO || editingPO.status !== 'Approved') && (
+          <button
+            type="button"
+            onClick={handleApproveClick}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
+          >
+            Approve
+          </button>
+        )}
       </div>
 
       {/* Message */}
@@ -970,15 +1000,24 @@ const PurchaseOrder = () => {
           >
             Cancel
           </button>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-secondary-900"
-          >
-            <option value="Draft">Draft</option>
-            <option value="Sent">Sent</option>
-            <option value="Approved">Approved</option>
-          </select>
+          {editingPO && (editingPO.status === 'Approved' || selectedStatus === 'Approved') ? (
+            <select
+              value="Approved"
+              disabled
+              className="px-3 py-2 bg-secondary-100 border border-secondary-200 rounded-lg text-sm font-semibold text-secondary-700 cursor-not-allowed"
+            >
+              <option value="Approved">Approved</option>
+            </select>
+          ) : (
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-secondary-900"
+            >
+              <option value="Draft">Draft</option>
+              <option value="Sent">Sent</option>
+            </select>
+          )}
           <button
             type="button"
             onClick={() => handleSubmit(selectedStatus)}
@@ -1010,6 +1049,18 @@ const PurchaseOrder = () => {
         onClose={() => setShowAccountModal(false)}
         onSuccess={handleAccountSuccess}
       />
+
+      {isApproving && (
+        <div className="fixed inset-0 z-[999] bg-black bg-opacity-30 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
+            <div className="w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div>
+              <p className="text-sm font-semibold text-secondary-900">Moving purchase order to Bill...</p>
+              <p className="text-xs text-secondary-600">Please wait a moment.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

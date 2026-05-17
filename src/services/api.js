@@ -1,7 +1,8 @@
 // src/services/api.js
 import axios from 'axios';
 
-const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com/api';
+//const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,7 +13,7 @@ const api = axios.create({
 
 // API endpoints
 export const salesInvoiceAPI = {
-  getAll: () => api.get('/sales-invoices'),
+  getAll: () => api.get('/sales-invoices', { params: { _t: Date.now() } }),
   getById: (id) => api.get(`/sales-invoices/${id}`),
   create: (data) => api.post('/sales-invoices', data),
   update: (id, data) => api.patch(`/sales-invoices/${id}`, data),
@@ -50,6 +51,7 @@ export const chartOfAccountsAPI = {
   create: (data) => api.post('/chart-of-accounts', data),
   update: (id, data) => api.patch(`/chart-of-accounts/${id}`, data),
   delete: (id) => api.delete(`/chart-of-accounts/${id}`),
+  importDefaults: () => api.post('/chart-of-accounts/import-defaults'),
 };
 
 export const bankAccountAPI = {
@@ -58,6 +60,11 @@ export const bankAccountAPI = {
   create: (data) => api.post('/bank-accounts', data),
   update: (id, data) => api.patch(`/bank-accounts/${id}`, data),
   delete: (id) => api.delete(`/bank-accounts/${id}`),
+};
+
+export const bankTransactionAPI = {
+  getAll: () => api.get('/bank-transactions'),
+  create: (data) => api.post('/bank-transactions', data),
 };
 
 export const accountTypeAPI = {
