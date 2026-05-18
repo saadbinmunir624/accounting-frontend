@@ -19,9 +19,7 @@ import {
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:5000/api/reports';
+import api from '../../services/api';
 
 const Reports = () => {
   const [selectedCategory, setSelectedCategory] = useState('financial');
@@ -52,10 +50,10 @@ const Reports = () => {
   const fetchFilterOptions = async () => {
     try {
       const [contacts, accounts, bankAccounts, items] = await Promise.all([
-        axios.get('http://localhost:5000/api/contacts').catch(e => ({ data: [] })),
-        axios.get('http://localhost:5000/api/chart-of-accounts').catch(e => ({ data: [] })),
-        axios.get('http://localhost:5000/api/bank-accounts').catch(e => ({ data: [] })),
-        axios.get('http://localhost:5000/api/items').catch(e => ({ data: [] })),
+        api.get('/contacts').catch(e => ({ data: [] })),
+        api.get('/chart-of-accounts').catch(e => ({ data: [] })),
+        api.get('/bank-accounts').catch(e => ({ data: [] })),
+        api.get('/items').catch(e => ({ data: [] })),
       ]);
 
       setFilterOptions({
@@ -154,9 +152,7 @@ const Reports = () => {
       if (filters.itemId) queryParams.append('itemId', filters.itemId);
       if (filters.status) queryParams.append('status', filters.status);
 
-      const response = await axios.get(
-        `${API_BASE_URL}/${selectedReport.id}?${queryParams.toString()}`
-      );
+      const response = await api.get(`/reports/${selectedReport.id}?${queryParams.toString()}`);
       
       setReportData(response.data);
     } catch (error) {

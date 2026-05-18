@@ -16,7 +16,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import api from '../../services/api';
 
 const Users = () => {
   const { user: currentUser, isAdmin } = useAuth();
@@ -48,7 +48,7 @@ const Users = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/users');
+      const response = await api.get('/users');
       setUsers(response.data.data || response.data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -135,10 +135,7 @@ const Users = () => {
         }
         delete updateData.username; // Username cannot be changed
 
-        const response = await axios.patch(
-          `http://localhost:5000/api/users/${editingUser._id}`,
-          updateData
-        );
+        const response = await api.patch(`/users/${editingUser._id}`, updateData);
 
         if (response.data.success) {
           setMessage({ type: 'success', text: 'User updated successfully!' });
@@ -152,7 +149,7 @@ const Users = () => {
           return;
         }
 
-        const response = await axios.post('http://localhost:5000/api/users/register', formData);
+        const response = await api.post('/users/register', formData);
 
         if (response.data.success) {
           setMessage({ type: 'success', text: 'User created successfully!' });
@@ -178,7 +175,7 @@ const Users = () => {
 
     if (window.confirm(`Are you sure you want to delete user "${username}"?`)) {
       try {
-        await axios.delete(`http://localhost:5000/api/users/${userId}`);
+        await api.delete(`/users/${userId}`);
         setMessage({ type: 'success', text: 'User deleted successfully!' });
         fetchUsers();
       } catch (error) {

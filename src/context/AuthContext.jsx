@@ -1,8 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
-
-// Base URL of deployed backend
-const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com/api';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -26,7 +23,7 @@ export const AuthProvider = ({ children }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       loadUser();
     } else {
       setLoading(false);
@@ -35,7 +32,7 @@ export const AuthProvider = ({ children }) => {
 
   const loadUser = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/users/profile`);
+      const response = await api.get('/users/profile');
       if (response.data.success) {
         setUser(response.data.data);
       }
@@ -49,7 +46,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/users/login`, {
+      const response = await api.post('/users/login', {
         username,
         password
       });
@@ -59,7 +56,7 @@ export const AuthProvider = ({ children }) => {
         setToken(newToken);
         setUser(userData);
         localStorage.setItem('token', newToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
         return { success: true };
       }
     } catch (error) {
@@ -73,14 +70,14 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/users/register`, userData);
+      const response = await api.post('/users/register', userData);
 
       if (response.data.success) {
         const { token: newToken, user: newUser } = response.data.data;
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem('token', newToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
         return { success: true };
       }
     } catch (error) {
@@ -96,12 +93,12 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['Authorization'];
   };
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/users/profile`, profileData);
+      const response = await api.patch('/users/profile', profileData);
 
       if (response.data.success) {
         setUser(response.data.data);
@@ -118,7 +115,7 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/users/change-password`, {
+      const response = await api.patch('/users/change-password', {
         currentPassword,
         newPassword
       });
